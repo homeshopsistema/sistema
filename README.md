@@ -216,3 +216,18 @@ Corrigido:
 
 Depois de enviar ao GitHub, faça uma nova implantação com **Clear Build Cache**.
 Nas configurações do projeto, use Node.js 24.x.
+
+
+## V25 — Instalação completa do banco Supabase
+
+Execute `supabase/INSTALAR_BANCO_COMPLETO.sql` no SQL Editor do Supabase antes de usar o sistema.
+
+
+## V26 — PDFs profissionais em uma página
+
+- Ordem de Serviço redesenhada em formato profissional A4.
+- Ordem de Serviço limitada a uma única página.
+- Logo, dados da loja, cliente, aparelho, financeiro, termos e assinaturas organizados.
+- Seção e campo de fotos anexadas removidos.
+- Romaneio redesenhado em uma página com tabela e total corretamente alinhados.
+- Texto “V23 responsivo mobile” removido do menu.

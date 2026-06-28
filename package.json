@@ -1,7 +1,7 @@
 {
-  "name": "bazar-eletronicos-v24-vercel-corrigido",
+  "name": "bazar-eletronicos-v26-pdfs-profissionais",
   "private": true,
-  "version": "24.0.0",
+  "version": "26.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
