@@ -3025,7 +3025,7 @@ function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page
         doc.text(String(item.quantity || 0), 23, y + 5)
         doc.text(String(item.description || '').slice(0, 46), 38, y + 5)
         doc.text(money(item.unit_price || 0).replace('R$', '').trim(), 166, y + 5, { align: 'right' })
-        doc.text(money(lineTotal).replace('R$', '').trim(), 192, y + 5, { align: 'right' })
+        doc.text(money(lineTotal).replace('R$', '').trim(), 203, y + 5, { align: 'right' })
       }
       y += 8
     }
