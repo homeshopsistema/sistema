@@ -457,7 +457,7 @@ function Sidebar({
             {showLabels && (
               <div className="min-w-0">
                 <strong className="block truncate">Bazar ERP</strong>
-                <p className="truncate text-xs text-slate-400">V23 responsivo mobile</p>
+                
               </div>
             )}
           </div>
@@ -2521,7 +2521,7 @@ function ServiceOrdersPage() {
     payment_method: 'Pix', service_status: 'Recebido',
     internal_notes: '',
     assistance_terms: 'Estou ciente que a assistência técnica não se responsabiliza por dados pessoais que possam ser perdidos durante o reparo. Autorizo o serviço descrito acima.',
-    customer_signature: '', photos: '', product_id: '', product_name: ''
+    customer_signature: '', product_id: '', product_name: ''
   }
 
   const [form, setForm] = useState<any>(emptyForm)
@@ -2584,7 +2584,7 @@ function ServiceOrdersPage() {
       internal_notes: form.internal_notes,
       assistance_terms: form.assistance_terms,
       customer_signature: form.customer_signature,
-      photos: form.photos,
+      photos: '',
       product_id: form.product_id || null,
       product_name: form.product_name || form.device,
       updated_at: new Date().toISOString()
@@ -2639,7 +2639,7 @@ function ServiceOrdersPage() {
       final_value: String(order.final_value || ''), paid_entry: String(order.paid_entry || ''),
       payment_method: order.payment_method || 'Pix', service_status: order.service_status || 'Recebido',
       internal_notes: order.internal_notes || '', assistance_terms: order.assistance_terms || emptyForm.assistance_terms,
-      customer_signature: order.customer_signature || '', photos: order.photos || '',
+      customer_signature: order.customer_signature || '',
       product_id: order.product_id || '', product_name: order.product_name || ''
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -2663,99 +2663,204 @@ function ServiceOrdersPage() {
   async function generatePDF(order: any) {
     const settings = await getStoreSettings()
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    const w = doc.internal.pageSize.getWidth()
-    let y = 12
+    const pageW = doc.internal.pageSize.getWidth()
+    const pageH = doc.internal.pageSize.getHeight()
+    const margin = 12
+    const contentW = pageW - margin * 2
+    const navy: [number, number, number] = [15, 23, 42]
+    const green: [number, number, number] = [16, 185, 129]
+    const light: [number, number, number] = [241, 245, 249]
+    const border: [number, number, number] = [203, 213, 225]
+    const muted: [number, number, number] = [71, 85, 105]
 
-    doc.setFillColor(15, 23, 42)
-    doc.rect(0, 0, w, 34, 'F')
+    function safe(value: any) {
+      const normalized = String(value ?? '').trim()
+      return normalized || '-'
+    }
+
+    function lines(value: any, width: number, maxLines = 2) {
+      const result = doc.splitTextToSize(safe(value), width) as string[]
+      if (result.length <= maxLines) return result
+      const clipped = result.slice(0, maxLines)
+      const last = clipped[maxLines - 1]
+      clipped[maxLines - 1] = `${last.slice(0, Math.max(0, last.length - 3))}...`
+      return clipped
+    }
+
+    function labelValue(
+      label: string,
+      value: any,
+      x: number,
+      y: number,
+      width: number,
+      maxLines = 1
+    ) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7)
+      doc.setTextColor(...muted)
+      doc.text(label.toUpperCase(), x, y)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(...navy)
+      doc.text(lines(value, width, maxLines), x, y + 4)
+    }
+
+    function sectionTitle(title: string, y: number) {
+      doc.setFillColor(...navy)
+      doc.roundedRect(margin, y, contentW, 8, 1.5, 1.5, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(255, 255, 255)
+      doc.text(title, margin + 4, y + 5.4)
+    }
+
+    // Cabeçalho profissional.
+    doc.setFillColor(...navy)
+    doc.rect(0, 0, pageW, 36, 'F')
+
+    const logo = await imageUrlToDataUrl(settings.logo_url || '')
+    let brandX = margin
+    if (logo) {
+      try {
+        const format = logo.startsWith('data:image/jpeg') || logo.startsWith('data:image/jpg') ? 'JPEG' : 'PNG'
+        doc.addImage(logo, format, margin, 7, 28, 21)
+        brandX = 44
+      } catch {}
+    }
+
     doc.setTextColor(255, 255, 255)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(18)
-    doc.text(settings.store_name || 'HOMEshop Assistência Técnica', 14, 14)
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`CNPJ: ${settings.cnpj || '-'}`, 14, 21)
-    doc.text(`Endereço: ${settings.address || '-'}`, 14, 26)
-    doc.text(`WhatsApp: ${settings.phone || order.whatsapp || '-'}`, 14, 31)
-    doc.setFont('helvetica', 'bold')
     doc.setFontSize(16)
-    doc.text('ORDEM DE SERVIÇO', w - 14, 15, { align: 'right' })
-    doc.setTextColor(220, 38, 38)
-    doc.text(`Nº ${formatOSNumber(order.os_number)}`, w - 14, 25, { align: 'right' })
+    doc.text(settings.store_name || 'HOMEshop Assistência Técnica', brandX, 13)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.text(`CNPJ: ${safe(settings.cnpj)}`, brandX, 19)
+    doc.text(`Contato: ${safe(settings.phone || order.whatsapp)}`, brandX, 24)
+    doc.text(`Endereço: ${safe(settings.address)}`.slice(0, 78), brandX, 29)
 
-    y = 42
-    doc.setTextColor(15, 23, 42)
+    doc.setFillColor(...green)
+    doc.roundedRect(pageW - 65, 7, 53, 22, 2, 2, 'F')
+    doc.setTextColor(...navy)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.text('ORDEM DE SERVIÇO', pageW - 38.5, 14, { align: 'center' })
+    doc.setFontSize(15)
+    doc.text(formatOSNumber(order.os_number), pageW - 38.5, 23, { align: 'center' })
 
-    function section(title: string) {
-      doc.setFillColor(241, 245, 249)
-      doc.setDrawColor(203, 213, 225)
-      doc.rect(14, y, w - 28, 8, 'FD')
+    // Identificação.
+    let y = 42
+    doc.setDrawColor(...border)
+    doc.setFillColor(255, 255, 255)
+    doc.roundedRect(margin, y, contentW, 31, 2, 2, 'FD')
+    labelValue('Cliente', order.customer_name || order.customers?.name, margin + 5, y + 7, 78)
+    labelValue('WhatsApp', order.whatsapp || order.customers?.phone, 105, y + 7, 42)
+    labelValue('Instagram', order.instagram, 153, y + 7, 40)
+    labelValue('Entrada', new Date(order.created_at).toLocaleString('pt-BR'), margin + 5, y + 21, 62)
+    labelValue('Técnico responsável', order.technician, 82, y + 21, 48)
+    labelValue('Prioridade', order.priority, 136, y + 21, 27)
+    labelValue('Status', order.service_status, 168, y + 21, 27)
+
+    // Aparelho e diagnóstico.
+    y = 78
+    sectionTitle('APARELHO, DIAGNÓSTICO E SERVIÇO', y)
+    y += 11
+    doc.setFillColor(...light)
+    doc.setDrawColor(...border)
+    doc.roundedRect(margin, y, contentW, 54, 2, 2, 'FD')
+
+    labelValue('Aparelho', order.device || order.product_name, margin + 5, y + 8, 78, 2)
+    labelValue('Prazo estimado', order.estimated_deadline ? brDate(order.estimated_deadline) : '-', 126, y + 8, 66)
+    labelValue('Defeito relatado pelo cliente', order.reported_defect, margin + 5, y + 23, 175, 2)
+    labelValue('Condição visual', order.visual_condition, margin + 5, y + 38, 83, 2)
+    labelValue('Serviço solicitado', order.requested_service, 105, y + 38, 87, 2)
+
+    // Financeiro.
+    y = 147
+    sectionTitle('RESUMO FINANCEIRO', y)
+    y += 11
+    doc.setDrawColor(...border)
+    doc.setFillColor(255, 255, 255)
+    doc.roundedRect(margin, y, contentW, 34, 2, 2, 'FD')
+
+    const boxW = 35
+    const boxY = y + 5
+    const financial = [
+      ['Estimado', money(order.estimated_value || 0)],
+      ['Valor final', money(order.final_value || 0)],
+      ['Entrada paga', money(order.paid_entry || 0)],
+      ['Saldo restante', money(order.remaining_balance || 0)]
+    ]
+
+    financial.forEach((item, index) => {
+      const x = margin + 5 + index * (boxW + 2)
+      doc.setFillColor(index === 3 ? 236 : 248, index === 3 ? 253 : 250, index === 3 ? 245 : 252)
+      doc.roundedRect(x, boxY, boxW, 21, 1.5, 1.5, 'F')
       doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7)
+      doc.setTextColor(...muted)
+      doc.text(item[0].toUpperCase(), x + 3, boxY + 6)
       doc.setFontSize(10)
-      doc.text(title, 17, y + 5.5)
-      y += 10
-    }
+      doc.setTextColor(...navy)
+      doc.text(item[1], x + 3, boxY + 15)
+    })
 
-    function row(label: string, value: any) {
+    labelValue('Forma de pagamento', order.payment_method, 163, y + 9, 30)
+    labelValue('PIX', '41-98464-8144', 163, y + 21, 30)
+
+    // Termos e observações, compactos para permanecer em uma página.
+    y = 196
+    sectionTitle('TERMOS E OBSERVAÇÕES', y)
+    y += 11
+    doc.setDrawColor(...border)
+    doc.setFillColor(...light)
+    doc.roundedRect(margin, y, contentW, 42, 2, 2, 'FD')
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(...muted)
+    doc.text('TERMOS DA ASSISTÊNCIA', margin + 5, y + 7)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...navy)
+    doc.text(lines(order.assistance_terms, 176, 5), margin + 5, y + 12)
+
+    const internalNotes = safe(order.internal_notes)
+    if (internalNotes !== '-') {
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8)
-      doc.text(label, 16, y + 4)
+      doc.setFontSize(7)
+      doc.setTextColor(...muted)
+      doc.text('OBSERVAÇÕES', margin + 5, y + 33)
       doc.setFont('helvetica', 'normal')
-      const text = doc.splitTextToSize(String(value || '-'), w - 70)
-      doc.text(text, 58, y + 4)
-      y += Math.max(7, text.length * 4)
+      doc.setFontSize(7.5)
+      doc.setTextColor(...navy)
+      doc.text(lines(internalNotes, 176, 2), margin + 5, y + 38)
     }
 
-    section('DADOS DO CLIENTE')
-    row('Cliente:', order.customer_name || order.customers?.name)
-    row('Instagram:', order.instagram)
-    row('WhatsApp:', order.whatsapp)
-    row('Data/Hora:', new Date(order.created_at).toLocaleString('pt-BR'))
+    // Assinaturas.
+    y = 245
+    doc.setDrawColor(...border)
+    doc.line(margin + 8, y + 18, 92, y + 18)
+    doc.line(118, y + 18, pageW - margin - 8, y + 18)
 
-    section('DADOS DO APARELHO')
-    row('Aparelho:', order.device)
-    row('Defeito relatado:', order.reported_defect)
-    row('Condição visual:', order.visual_condition)
-    row('Serviço solicitado:', order.requested_service)
-
-    section('DETALHES DO SERVIÇO')
-    row('Técnico:', order.technician)
-    row('Prioridade:', order.priority)
-    row('Prazo estimado:', order.estimated_deadline ? brDate(order.estimated_deadline) : '-')
-    row('Status:', order.service_status)
-    row('Observações internas:', order.internal_notes)
-
-    section('FINANCEIRO')
-    row('Valor estimado:', money(order.estimated_value || 0))
-    row('Valor final:', money(order.final_value || 0))
-    row('Entrada paga:', money(order.paid_entry || 0))
-    row('Saldo restante:', money(order.remaining_balance || 0))
-    row('Forma de pagamento:', order.payment_method)
-    row('Pix:', '41-98464-8144 — Abquella Carmo de Lima — Banco Itaú')
-
-    section('TERMOS DA ASSISTÊNCIA')
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
-    const terms = doc.splitTextToSize(order.assistance_terms || '-', w - 32)
-    doc.text(terms, 16, y)
-    y += Math.max(18, terms.length * 4 + 6)
-
-
-    if (y > 250) {
-      doc.addPage()
-      y = 18
+    doc.setTextColor(...navy)
+    const signature = safe(order.customer_signature)
+    if (signature !== '-') {
+      doc.setFont('helvetica', 'italic')
+      doc.setFontSize(11)
+      doc.text(signature.slice(0, 36), 54, y + 14, { align: 'center' })
     }
-
-    section('ASSINATURA DO CLIENTE')
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.text(order.customer_signature || '________________________________________', 30, y + 10)
-    doc.setFontSize(8)
-    doc.text('Assinatura do cliente', 55, y + 16)
-    doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 150, y + 16)
-    doc.setFontSize(8)
-    doc.setTextColor(100)
-    doc.text('Documento gerado pelo Sistema Bazar & Eletrônicos', 14, 287)
+    doc.setFontSize(7.5)
+    doc.text('Assinatura do cliente', 54, y + 23, { align: 'center' })
+    doc.text('Responsável pela assistência', 154, y + 23, { align: 'center' })
+
+    doc.setFontSize(7)
+    doc.setTextColor(...muted)
+    doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, margin, pageH - 8)
+    doc.text('Documento de controle interno — não fiscal', pageW - margin, pageH - 8, { align: 'right' })
+
     doc.save(`${formatOSNumber(order.os_number)}.pdf`)
   }
 
@@ -3055,98 +3160,181 @@ function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page
     const settings = await getStoreSettings()
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const pageW = doc.internal.pageSize.getWidth()
-    let y = 14
+    const pageH = doc.internal.pageSize.getHeight()
+    const margin = 12
+    const contentW = pageW - margin * 2
+    const navy: [number, number, number] = [15, 23, 42]
+    const green: [number, number, number] = [16, 185, 129]
+    const light: [number, number, number] = [241, 245, 249]
+    const border: [number, number, number] = [203, 213, 225]
+    const muted: [number, number, number] = [71, 85, 105]
+
+    function safe(value: any) {
+      const text = String(value ?? '').trim()
+      return text || '-'
+    }
+
+    function clip(value: any, width: number, maxLines = 1) {
+      const result = doc.splitTextToSize(safe(value), width) as string[]
+      if (result.length <= maxLines) return result
+      const output = result.slice(0, maxLines)
+      output[maxLines - 1] = `${output[maxLines - 1].slice(0, -3)}...`
+      return output
+    }
+
+    doc.setFillColor(...navy)
+    doc.rect(0, 0, pageW, 37, 'F')
 
     const logo = await imageUrlToDataUrl(settings.logo_url || '')
+    let brandX = margin
     if (logo) {
-      try { doc.addImage(logo, 'PNG', 82, y, 46, 25) } catch {}
-      y += 30
-    } else {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(18)
-      doc.text(settings.store_name || 'HOMEshop', pageW / 2, y + 8, { align: 'center' })
-      y += 18
+      try {
+        const format = logo.startsWith('data:image/jpeg') || logo.startsWith('data:image/jpg') ? 'JPEG' : 'PNG'
+        doc.addImage(logo, format, margin, 7, 29, 22)
+        brandX = 45
+      } catch {}
     }
 
-    doc.setFillColor(239, 239, 239)
-    doc.rect(14, y, pageW - 28, 28, 'F')
-    doc.setFontSize(10)
     doc.setFont('helvetica', 'bold')
-    doc.text(`NOME: ${r.customer_name || r.customers?.name || '-'}`, 18, y + 8)
-    doc.text(`INSTAGRAM: ${r.instagram || '-'}`, 18, y + 16)
-    doc.text(`CONTATO: ${r.whatsapp || '-'}`, 18, y + 24)
-    doc.text(`DATA: ${brDate(r.purchase_date || r.created_at)}`, pageW - 18, y + 8, { align: 'right' })
-    y += 34
+    doc.setFontSize(16)
+    doc.setTextColor(255, 255, 255)
+    doc.text(settings.store_name || 'HOMEshop', brandX, 14)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.text(`CNPJ: ${safe(settings.cnpj)}`, brandX, 20)
+    doc.text(`Contato: ${safe(settings.phone)}`, brandX, 25)
+    doc.text(`Endereço: ${safe(settings.address)}`.slice(0, 78), brandX, 30)
 
-    const colX = [14, 34, 123, 153, 181]
-    doc.setDrawColor(100)
-    doc.setFillColor(248, 248, 248)
-    doc.rect(14, y, pageW - 28, 9, 'FD')
-    doc.setFontSize(9)
-    doc.text('QTD', 20, y + 6)
-    doc.text('DESCRIÇÃO PRODUTOS', 60, y + 6)
-    doc.text('V.UNIT', 157, y + 6)
-    doc.text('TOTAL', 184, y + 6)
+    doc.setFillColor(...green)
+    doc.roundedRect(pageW - 61, 8, 49, 21, 2, 2, 'F')
+    doc.setTextColor(...navy)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('ROMANEIO', pageW - 36.5, 16, { align: 'center' })
+    doc.setFontSize(8)
+    doc.text(`#${String(r.id || '').slice(0, 8).toUpperCase()}`, pageW - 36.5, 23, { align: 'center' })
 
-    y += 9
-    const pdfItems = Array.isArray(r.items) ? r.items : []
-    for (let i = 0; i < Math.max(10, pdfItems.length); i++) {
+    let y = 43
+    doc.setDrawColor(...border)
+    doc.setFillColor(...light)
+    doc.roundedRect(margin, y, contentW, 28, 2, 2, 'FD')
+
+    const customerName = r.customer_name || r.customers?.name || '-'
+    const info = [
+      ['CLIENTE', customerName, margin + 5, y + 7, 77],
+      ['CONTATO', r.whatsapp, 104, y + 7, 42],
+      ['INSTAGRAM', r.instagram, 151, y + 7, 42],
+      ['DATA', brDate(r.purchase_date || r.created_at), margin + 5, y + 19, 50],
+      ['PAGAMENTO', r.payment_method || 'Pix', 74, y + 19, 48],
+      ['ENTREGA', r.delivery_status || 'Pendente', 128, y + 19, 65]
+    ]
+
+    info.forEach(([label, value, x, yy, width]: any) => {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(6.8)
+      doc.setTextColor(...muted)
+      doc.text(label, x, yy)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8.5)
+      doc.setTextColor(...navy)
+      doc.text(clip(value, width, 1), x, yy + 4)
+    })
+
+    y = 78
+    const tableX = margin
+    const tableW = contentW
+    const headerH = 9
+    const rowH = 9
+    const maxRows = 14
+    const colQty = 18
+    const colDesc = 91
+    const colUnit = 36
+    const colTotal = tableW - colQty - colDesc - colUnit
+    const x1 = tableX + colQty
+    const x2 = x1 + colDesc
+    const x3 = x2 + colUnit
+    const x4 = tableX + tableW
+
+    doc.setFillColor(...navy)
+    doc.roundedRect(tableX, y, tableW, headerH, 1.5, 1.5, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.text('QTD', tableX + colQty / 2, y + 6, { align: 'center' })
+    doc.text('DESCRIÇÃO DO PRODUTO / SERVIÇO', x1 + 4, y + 6)
+    doc.text('V. UNITÁRIO', x2 + colUnit / 2, y + 6, { align: 'center' })
+    doc.text('TOTAL', x3 + colTotal / 2, y + 6, { align: 'center' })
+
+    y += headerH
+    const pdfItems = Array.isArray(r.items) ? r.items.slice(0, maxRows) : []
+
+    for (let i = 0; i < maxRows; i++) {
       const item = pdfItems[i]
-      doc.rect(14, y, pageW - 28, 8)
-      doc.line(34, y, 34, y + 8)
-      doc.line(123, y, 123, y + 8)
-      doc.line(153, y, 153, y + 8)
-      doc.line(181, y, 181, y + 8)
+      doc.setFillColor(i % 2 === 0 ? 255 : 248, i % 2 === 0 ? 255 : 250, i % 2 === 0 ? 255 : 252)
+      doc.rect(tableX, y, tableW, rowH, 'F')
+      doc.setDrawColor(...border)
+      doc.rect(tableX, y, tableW, rowH)
+      doc.line(x1, y, x1, y + rowH)
+      doc.line(x2, y, x2, y + rowH)
+      doc.line(x3, y, x3, y + rowH)
 
       if (item) {
-        const lineTotal = Number(item.quantity || 0) * Number(item.unit_price || 0)
+        const quantity = Number(item.quantity || 0)
+        const unit = Number(item.unit_price || 0)
+        const total = quantity * unit
+
+        doc.setTextColor(...navy)
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(8)
-        doc.text(String(item.quantity || 0), 23, y + 5)
-        doc.text(String(item.description || '').slice(0, 46), 38, y + 5)
-        doc.text(money(item.unit_price || 0).replace('R$', '').trim(), 166, y + 5, { align: 'right' })
-        doc.text(money(lineTotal).replace('R$', '').trim(), 203, y + 5, { align: 'right' })
+        doc.text(String(quantity), tableX + colQty / 2, y + 5.8, { align: 'center' })
+        doc.text(clip(item.description, colDesc - 8, 1), x1 + 4, y + 5.8)
+        doc.text(money(unit), x3 - 3, y + 5.8, { align: 'right' })
+        doc.text(money(total), x4 - 3, y + 5.8, { align: 'right' })
       }
-      y += 8
+      y += rowH
     }
 
-    y += 6
+    // Rodapé de pagamento e total.
+    y += 7
+    doc.setFillColor(...light)
+    doc.setDrawColor(...border)
+    doc.roundedRect(margin, y, 105, 39, 2, 2, 'FD')
+
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.text('PIX: 41-98464-8144', 18, y)
-    y += 5
-    doc.setFont('helvetica', 'normal')
-    doc.text('Abquella Carmo de Lima', 18, y)
-    y += 5
-    doc.text('Banco Itaú', 18, y)
-
-    doc.setFillColor(220, 220, 220)
-    doc.rect(120, y - 14, 75, 16, 'F')
-    doc.setFont('helvetica', 'bold')
-    doc.text('TOTAL R$', 128, y - 4)
-    doc.text(money(r.total || 0).replace('R$', '').trim(), 170, y - 4)
-
-    y += 14
-    doc.setFontSize(10)
-    doc.text('Pago', 18, y)
-    doc.rect(31, y - 4, 5, 5)
-    if (r.payment_status === 'Pago') {
-      doc.text('X', 32, y)
-    }
-    doc.text('Forma de Pagamento:', 48, y)
-    doc.line(92, y, 155, y)
-
-    y += 11
-    doc.text('Entregue', 18, y)
-    doc.rect(37, y - 4, 5, 5)
-    if (r.delivery_status === 'Entregue') {
-      doc.text('X', 38, y)
-    }
-
     doc.setFontSize(8)
-    doc.setTextColor(100)
-    doc.text('Romaneio gerado pelo sistema.', 14, 287)
-    doc.save(`romaneio-${r.customer_name || 'cliente'}-${r.id.slice(0, 6)}.pdf`)
+    doc.setTextColor(...muted)
+    doc.text('PAGAMENTO VIA PIX', margin + 5, y + 8)
+    doc.setFontSize(11)
+    doc.setTextColor(...navy)
+    doc.text('41-98464-8144', margin + 5, y + 16)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.text('Abquella Carmo de Lima', margin + 5, y + 23)
+    doc.text('Banco Itaú', margin + 5, y + 29)
+
+    const statusPago = r.payment_status === 'Pago' ? 'PAGO' : 'PENDENTE'
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(...muted)
+    doc.text(`STATUS: ${statusPago}`, margin + 62, y + 16)
+    doc.text(`ENTREGA: ${safe(r.delivery_status)}`, margin + 62, y + 24)
+
+    doc.setFillColor(...green)
+    doc.roundedRect(124, y, pageW - margin - 124, 39, 2, 2, 'F')
+    doc.setTextColor(...navy)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.text('VALOR TOTAL', 129, y + 10)
+    doc.setFontSize(19)
+    doc.text(money(r.total || 0), pageW - margin - 5, y + 25, { align: 'right' })
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(...muted)
+    doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, margin, pageH - 8)
+    doc.text('Romaneio de controle interno — não fiscal', pageW - margin, pageH - 8, { align: 'right' })
+
+    doc.save(`romaneio-${customerName}-${String(r.id || '').slice(0, 6)}.pdf`)
   }
 
   function sendWhatsapp(r: any) {
