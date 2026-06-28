@@ -189,3 +189,30 @@ Corrigido:
 Corrigido:
 - Valor da coluna TOTAL agora fica dentro do quadrado da tabela.
 - Descrição do produto foi limitada para não invadir as colunas de valor.
+
+
+## V23 — Responsivo para celular
+
+- Menu lateral móvel em formato de gaveta.
+- Botão para abrir e fechar o menu no celular.
+- Formulários adaptados para telas pequenas.
+- Tabelas com rolagem horizontal.
+- Cards, botões, campos e espaçamentos otimizados para toque.
+- Cabeçalho fixo no topo.
+- Login responsivo.
+
+
+## V24 — Correção definitiva para implantação na Vercel
+
+- Node.js atualizado para 24.x.
+- npm 11 definido como gerenciador do projeto.
+- `package-lock.json` corrigido para usar apenas `https://registry.npmjs.org/`.
+- Removidas todas as referências ao registro interno `applied-caas`.
+- `.npmrc` configurado para o registro público e novas tentativas em caso de falha de rede.
+- `vercel.json` configurado com `npm ci`, `npm run build` e saída `dist`.
+- Projeto responsivo da V23 preservado.
+
+### Vercel
+
+Depois de enviar ao GitHub, faça uma nova implantação com **Clear Build Cache**.
+Nas configurações do projeto, use Node.js 24.x.
