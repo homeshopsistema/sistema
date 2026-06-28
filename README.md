@@ -231,3 +231,12 @@ Execute `supabase/INSTALAR_BANCO_COMPLETO.sql` no SQL Editor do Supabase antes d
 - Seção e campo de fotos anexadas removidos.
 - Romaneio redesenhado em uma página com tabela e total corretamente alinhados.
 - Texto “V23 responsivo mobile” removido do menu.
+
+
+## V27 — Nome da loja no menu
+
+- Remove o texto fixo “Bazar ERP”.
+- Exibe no menu lateral o nome salvo em Configurações.
+- Atualiza o nome automaticamente após salvar.
+- Usa a primeira letra do nome da loja no ícone verde.
+- Atualiza o título da aba do navegador.

@@ -393,7 +393,8 @@ function Sidebar({
   collapsed,
   setCollapsed,
   mobileOpen,
-  setMobileOpen
+  setMobileOpen,
+  storeName
 }: {
   page: Page
   setPage: (p: Page) => void
@@ -401,6 +402,7 @@ function Sidebar({
   setCollapsed: (v: boolean) => void
   mobileOpen: boolean
   setMobileOpen: (v: boolean) => void
+  storeName: string
 }) {
   const items = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -427,6 +429,7 @@ function Sidebar({
   }
 
   const showLabels = mobileOpen || !collapsed
+  const storeInitial = (storeName || 'Loja').trim().charAt(0).toUpperCase() || 'L'
 
   return (
     <>
@@ -451,12 +454,14 @@ function Sidebar({
         <div className="flex items-center justify-between gap-3 px-1 py-3 sm:px-2 sm:py-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-2xl font-black text-slate-950">
-              B
+              {storeInitial}
             </div>
 
             {showLabels && (
               <div className="min-w-0">
-                <strong className="block truncate">Bazar ERP</strong>
+                <strong className="block truncate" title={storeName}>
+                  {storeName || 'Minha Loja'}
+                </strong>
                 
               </div>
             )}
@@ -2049,6 +2054,11 @@ function SettingsPage() {
       if (data) setForm(data)
     }
 
+    window.dispatchEvent(
+      new CustomEvent('store-settings-updated', {
+        detail: { store_name: form.store_name || 'Minha Loja' }
+      })
+    )
     setSaved(true)
   }
 
@@ -3556,6 +3566,7 @@ function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [menuCollapsed, setMenuCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [storeName, setStoreName] = useState('Minha Loja')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -3566,6 +3577,36 @@ function App() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setSession(session))
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!session) return
+
+    let mounted = true
+
+    async function loadStoreName() {
+      const settings = await getStoreSettings()
+      if (!mounted) return
+
+      const name = String(settings.store_name || '').trim() || 'Minha Loja'
+      setStoreName(name)
+      document.title = name
+    }
+
+    function handleSettingsUpdated(event: Event) {
+      const customEvent = event as CustomEvent<{ store_name?: string }>
+      const name = String(customEvent.detail?.store_name || '').trim() || 'Minha Loja'
+      setStoreName(name)
+      document.title = name
+    }
+
+    loadStoreName()
+    window.addEventListener('store-settings-updated', handleSettingsUpdated)
+
+    return () => {
+      mounted = false
+      window.removeEventListener('store-settings-updated', handleSettingsUpdated)
+    }
+  }, [session])
 
   if (loading) return <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">Carregando...</main>
   if (!session) return <Login />
@@ -3594,6 +3635,7 @@ function App() {
         setCollapsed={setMenuCollapsed}
         mobileOpen={mobileMenuOpen}
         setMobileOpen={setMobileMenuOpen}
+        storeName={storeName}
       />
       <main className="min-w-0 flex-1 overflow-x-hidden">
         <Header title={titles[page]} onOpenMenu={() => setMobileMenuOpen(true)} />
