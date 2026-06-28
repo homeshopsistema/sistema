@@ -2740,12 +2740,6 @@ function ServiceOrdersPage() {
     doc.text(terms, 16, y)
     y += Math.max(18, terms.length * 4 + 6)
 
-    section('FOTOS ANEXADAS')
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    const photos = doc.splitTextToSize(order.photos || 'Nenhuma foto anexada.', w - 32)
-    doc.text(photos, 16, y)
-    y += Math.max(12, photos.length * 4 + 6)
 
     if (y > 250) {
       doc.addPage()
@@ -2802,7 +2796,6 @@ function ServiceOrdersPage() {
           <div><label className="label">Forma de pagamento</label><select className="input" value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })}><option>Pix</option><option>Dinheiro</option><option>Cartão débito</option><option>Cartão crédito</option><option>Fiado</option></select></div>
 
           <div className="md:col-span-2"><label className="label">Observações internas</label><textarea className="input min-h-[90px]" value={form.internal_notes} onChange={e => setForm({ ...form, internal_notes: e.target.value })} /></div>
-          <div className="md:col-span-2"><label className="label">Fotos anexadas</label><textarea className="input min-h-[90px]" placeholder="Cole links das fotos ou nomes dos arquivos separados por linha" value={form.photos} onChange={e => setForm({ ...form, photos: e.target.value })} /></div>
           <div className="md:col-span-3"><label className="label">Termos da assistência</label><textarea className="input min-h-[110px]" value={form.assistance_terms} onChange={e => setForm({ ...form, assistance_terms: e.target.value })} /></div>
           <div><label className="label">Assinatura do cliente</label><textarea className="input min-h-[110px]" placeholder="Digite o nome ou assinatura manual" value={form.customer_signature} onChange={e => setForm({ ...form, customer_signature: e.target.value })} /></div>
         </div>
