@@ -52,7 +52,7 @@ type ServiceOrder = {
 }
 
 const PIX_KEY = '41-98464-8144'
-const PIX_HOLDER = 'Abquella Carmo de Lima'
+const PIX_HOLDER = 'Abqueila Carmo de Lima'
 const PIX_BANK = 'Banco Itaú'
 
 function money(value: number) {

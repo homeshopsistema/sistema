@@ -145,7 +145,7 @@ create table if not exists public.service_orders (
   total numeric(12,2) not null default 0,
   notes text,
   pix_key text not null default '41-98464-8144',
-  pix_holder text not null default 'Abquella Carmo de Lima',
+  pix_holder text not null default 'Abqueila Carmo de Lima',
   pix_bank text not null default 'Banco Itaú',
   created_at timestamptz default now(),
   updated_at timestamptz default now()

@@ -11,7 +11,7 @@ Versão criada sobre a **V18 corrigida com caixa, cupom e menu recolhível**.
 - PDF A4 profissional inspirado no modelo enviado.
 - Dados PIX no PDF:
   - Chave: `41-98464-8144`
-  - Titular: `Abquella Carmo de Lima`
+  - Titular: `Abqueila Carmo de Lima`
   - Banco: `Banco Itaú`
 - Histórico organizado em tabela.
 - Controle de pago/pendente.
@@ -160,7 +160,7 @@ Incluído:
 - Múltiplos produtos no romaneio
 - Total automático
 - PDF parecido com o modelo enviado
-- Pix fixo: 41-98464-8144 — Abquella Carmo de Lima — Banco Itaú
+- Pix fixo: 41-98464-8144 — Abqueila Carmo de Lima — Banco Itaú
 - Histórico/listagem de romaneios
 - Alterar, excluir, gerar PDF e enviar WhatsApp
 - Clicar no nome do cliente abre o histórico do cliente

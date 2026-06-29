@@ -2875,7 +2875,7 @@ function ServiceOrdersPage() {
   }
 
   function sendWhatsapp(order: any) {
-    const msg = `Olá ${order.customer_name || ''}, segue sua Ordem de Serviço ${formatOSNumber(order.os_number)}.\n\nAparelho: ${order.device || '-'}\nServiço: ${order.requested_service || '-'}\nStatus: ${order.service_status || '-'}\nValor final: ${money(order.final_value || 0)}\nEntrada paga: ${money(order.paid_entry || 0)}\nSaldo restante: ${money(order.remaining_balance || 0)}\n\nPix: 41-98464-8144\nAbquella Carmo de Lima\nBanco Itaú`
+    const msg = `Olá ${order.customer_name || ''}, segue sua Ordem de Serviço ${formatOSNumber(order.os_number)}.\n\nAparelho: ${order.device || '-'}\nServiço: ${order.requested_service || '-'}\nStatus: ${order.service_status || '-'}\nValor final: ${money(order.final_value || 0)}\nEntrada paga: ${money(order.paid_entry || 0)}\nSaldo restante: ${money(order.remaining_balance || 0)}\n\nPix: 41-98464-8144\nAbqueila Carmo de Lima\nBanco Itaú`
     openWhatsappNumber(order.whatsapp, msg)
   }
 
@@ -3319,7 +3319,7 @@ function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page
     doc.text('41-98464-8144', margin + 5, y + 16)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
-    doc.text('Abquella Carmo de Lima', margin + 5, y + 23)
+    doc.text('Abqueila Carmo de Lima', margin + 5, y + 23)
     doc.text('Banco Itaú', margin + 5, y + 29)
 
     const statusPago = r.payment_status === 'Pago' ? 'PAGO' : 'PENDENTE'
@@ -3357,7 +3357,7 @@ function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page
       `${itemList}\n\n` +
       `Total: ${money(r.total || 0)}\n` +
       `Pix: 41-98464-8144\n` +
-      `Abquella Carmo de Lima\n` +
+      `Abqueila Carmo de Lima\n` +
       `Banco Itaú`
 
     openWhatsappNumber(r.whatsapp, msg)
@@ -3495,7 +3495,7 @@ function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page
           <div className="mini">
             <p className="text-slate-400">Pix</p>
             <strong>41-98464-8144</strong>
-            <p>Abquella Carmo de Lima</p>
+            <p>Abqueila Carmo de Lima</p>
             <p>Banco Itaú</p>
           </div>
 
