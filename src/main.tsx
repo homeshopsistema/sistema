@@ -769,9 +769,13 @@ function CashPage() {
   const [entries, setEntries] = useState<any[]>([])
   const [month, setMonth] = useState(currentMonth())
   const [message, setMessage] = useState('')
+  const [homeShopAccount, setHomeShopAccount] = useState<boolean | null>(null)
 
   async function load() {
     const user_id = await getUserId()
+
+    const isHomeShop = await isHomeShopAccount(user_id)
+    setHomeShopAccount(isHomeShop)
 
     const opened = await getOpenCashSession(user_id)
     setSession(opened)
@@ -920,55 +924,66 @@ function CashPage() {
         <Card title="Valor esperado" value={money(expected)} icon={BarChart3} />
       </div>
 
-      <section className="panel">
-        <h3>{session ? 'Fechamento de caixa' : 'Abertura de caixa'}</h3>
-
-        {!session && (
-          <div className="grid md:grid-cols-3 gap-3">
-            <div>
-              <label className="label">Valor inicial em dinheiro</label>
-              <input
-                className="input"
-                type="number"
-                step="0.01"
-                placeholder="Ex: 100.00"
-                value={openingAmount}
-                onChange={e => setOpeningAmount(e.target.value)}
-              />
-            </div>
-            <button className="btn self-end" onClick={openCash}>Abrir caixa</button>
+      {homeShopAccount ? (
+        <section className="panel">
+          <h3>Caixa permanente</h3>
+          <p className="mini mt-2">O caixa da HOMEshop permanece aberto automaticamente. Não é necessário abrir ou fechar o caixa.</p>
+          <div className="grid md:grid-cols-3 gap-3 mt-4">
+            <button className="btn2" onClick={() => quickEntry('sangria')}>Sangria</button>
+            <button className="btn2" onClick={() => quickEntry('suprimento')}>Suprimento</button>
           </div>
-        )}
+        </section>
+      ) : homeShopAccount === false ? (
+        <section className="panel">
+          <h3>{session ? 'Fechamento de caixa' : 'Abertura de caixa'}</h3>
 
-        {session && (
-          <div className="grid md:grid-cols-5 gap-3">
-            <div>
-              <label className="label">Valor contado no caixa</label>
-              <input
-                className="input"
-                type="number"
-                step="0.01"
-                placeholder="Ex: 400.00"
-                value={closingAmount}
-                onChange={e => setClosingAmount(e.target.value)}
-              />
+          {!session && (
+            <div className="grid md:grid-cols-3 gap-3">
+              <div>
+                <label className="label">Valor inicial em dinheiro</label>
+                <input
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  placeholder="Ex: 100.00"
+                  value={openingAmount}
+                  onChange={e => setOpeningAmount(e.target.value)}
+                />
+              </div>
+              <button className="btn self-end" onClick={openCash}>Abrir caixa</button>
             </div>
+          )}
 
-            <div className="mini">
-              Diferença<br/>
-              <b className={difference < 0 ? 'text-red-300' : 'text-emerald-300'}>
-                {money(difference)}
-              </b>
+          {session && (
+            <div className="grid md:grid-cols-5 gap-3">
+              <div>
+                <label className="label">Valor contado no caixa</label>
+                <input
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  placeholder="Ex: 400.00"
+                  value={closingAmount}
+                  onChange={e => setClosingAmount(e.target.value)}
+                />
+              </div>
+
+              <div className="mini">
+                Diferença<br/>
+                <b className={difference < 0 ? 'text-red-300' : 'text-emerald-300'}>
+                  {money(difference)}
+                </b>
+              </div>
+
+              <button className="btn self-end" onClick={closeCash}>Fechar caixa</button>
+              <button className="btn2 self-end" onClick={() => quickEntry('sangria')}>Sangria</button>
+              <button className="btn2 self-end" onClick={() => quickEntry('suprimento')}>Suprimento</button>
             </div>
+          )}
 
-            <button className="btn self-end" onClick={closeCash}>Fechar caixa</button>
-            <button className="btn2 self-end" onClick={() => quickEntry('sangria')}>Sangria</button>
-            <button className="btn2 self-end" onClick={() => quickEntry('suprimento')}>Suprimento</button>
-          </div>
-        )}
-
-        {message && <p className="mt-4 mini">{message}</p>}
-      </section>
+          {message && <p className="mt-4 mini">{message}</p>}
+        </section>
+      ) : null}
 
       <section className="panel">
         <h3>Fluxo de caixa</h3>
