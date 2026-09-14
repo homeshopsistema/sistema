@@ -104,6 +104,9 @@ async function getUserEmail() {
 
 async function isHomeShopAccount(user_id: string) {
   if (!user_id) return false
+
+  // HOMEshop pode estar cadastrado como "HOMEshop Assistência Técnica".
+  // Por isso, usamos includes em vez de exigir igualdade exata.
   const { data } = await supabase
     .from('store_settings')
     .select('store_name')
@@ -111,8 +114,17 @@ async function isHomeShopAccount(user_id: string) {
     .limit(1)
     .maybeSingle()
 
-  const storeName = String(data?.store_name || '').replace(/\\s+/g, '').toLowerCase()
-  return storeName === 'homeshop'
+  const storeName = String(data?.store_name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '')
+    .toLowerCase()
+
+  if (storeName.includes('homeshop')) return true
+
+  // Fallback para contas cujo nome da loja ainda não foi configurado.
+  const email = await getUserEmail()
+  return String(email || '').toLowerCase().includes('homeshop')
 }
 
 async function getOpenCashSession(user_id: string) {

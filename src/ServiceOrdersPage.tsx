@@ -86,8 +86,15 @@ async function getOpenCashSession(user_id: string) {
     .limit(1)
     .maybeSingle()
 
-  const storeName = String(settings?.store_name || '').replace(/\s+/g, '').toLowerCase()
-  if (storeName !== 'homeshop') return null
+  const storeName = String(settings?.store_name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '')
+    .toLowerCase()
+  const { data: authData } = await supabase.auth.getUser()
+  const email = String(authData.user?.email || '').toLowerCase()
+  const isHomeShop = storeName.includes('homeshop') || email.includes('homeshop')
+  if (!isHomeShop) return null
 
   const { data: created, error: createError } = await supabase
     .from('cash_sessions')
