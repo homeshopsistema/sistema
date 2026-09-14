@@ -53,7 +53,11 @@
      *  waitUntil(): activating ====> activated
      */
     self.addEventListener('activate', event => {
-      event.waitUntil(self.clients.claim())
+      event.waitUntil((async () => {
+        const keys = await caches.keys()
+        await Promise.all(keys.filter(k => k !== 'pwa-cache-v2').map(k => caches.delete(k)))
+        await self.clients.claim()
+      })())
     })
 
     /**
@@ -85,7 +89,7 @@
 
         // Update the cache with the version we fetched (only for ok status)
         event.waitUntil(
-        Promise.all([fetchedCopy, caches.open("pwa-cache")])
+        Promise.all([fetchedCopy, caches.open("pwa-cache-v2")])
             .then(([response, cache]) => response.ok && cache.put(event.request, response))
             .catch(_ => { /* eat any errors */ })
         )
