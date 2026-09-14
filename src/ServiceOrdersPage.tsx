@@ -69,6 +69,52 @@ async function getUserId() {
   return data.user?.id || ''
 }
 
+async function getOpenCashSession(user_id: string) {
+  const { data: opened, error } = await supabase
+    .from('cash_sessions')
+    .select('id')
+    .eq('user_id', user_id)
+    .eq('status', 'aberto')
+    .maybeSingle()
+
+  if (opened || error) return opened || null
+
+  const { data: settings } = await supabase
+    .from('store_settings')
+    .select('store_name')
+    .eq('user_id', user_id)
+    .limit(1)
+    .maybeSingle()
+
+  const storeName = String(settings?.store_name || '').replace(/\s+/g, '').toLowerCase()
+  if (storeName !== 'homeshop') return null
+
+  const { data: created, error: createError } = await supabase
+    .from('cash_sessions')
+    .insert({
+      user_id,
+      opened_at: new Date().toISOString(),
+      opening_amount: 0,
+      status: 'aberto'
+    })
+    .select('id')
+    .single()
+
+  if (createError || !created) return null
+
+  await supabase.from('financial_entries').insert({
+    user_id,
+    description: 'Abertura automática de caixa HOMEshop',
+    type: 'abertura',
+    payment_method: 'Dinheiro',
+    amount: 0,
+    paid_at: new Date().toISOString(),
+    cash_session_id: created.id
+  })
+
+  return created
+}
+
 async function getStoreSettings() {
   const user_id = await getUserId()
   const { data } = await supabase
@@ -401,12 +447,7 @@ export default function ServiceOrdersPage() {
 
     let cashSessionId: string | null = null
     if (paid) {
-      const { data: cash } = await supabase
-        .from('cash_sessions')
-        .select('id')
-        .eq('user_id', user_id)
-        .eq('status', 'aberto')
-        .maybeSingle()
+      const cash = await getOpenCashSession(user_id)
       cashSessionId = cash?.id || null
     }
 

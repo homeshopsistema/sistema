@@ -102,6 +102,59 @@ async function getUserEmail() {
   return data.user?.email || ''
 }
 
+async function isHomeShopAccount(user_id: string) {
+  if (!user_id) return false
+  const { data } = await supabase
+    .from('store_settings')
+    .select('store_name')
+    .eq('user_id', user_id)
+    .limit(1)
+    .maybeSingle()
+
+  const storeName = String(data?.store_name || '').replace(/\\s+/g, '').toLowerCase()
+  return storeName === 'homeshop'
+}
+
+async function getOpenCashSession(user_id: string) {
+  const { data: opened, error } = await supabase
+    .from('cash_sessions')
+    .select('*')
+    .eq('user_id', user_id)
+    .eq('status', 'aberto')
+    .maybeSingle()
+
+  if (opened || error) return opened || null
+
+  // HOMEshop uses a permanent cash session: if none exists, create one
+  // automatically so the operator never needs to open the register manually.
+  if (!(await isHomeShopAccount(user_id))) return null
+
+  const { data: created, error: createError } = await supabase
+    .from('cash_sessions')
+    .insert({
+      user_id,
+      opened_at: new Date().toISOString(),
+      opening_amount: 0,
+      status: 'aberto'
+    })
+    .select()
+    .single()
+
+  if (createError || !created) return null
+
+  await supabase.from('financial_entries').insert({
+    user_id,
+    description: 'Abertura automática de caixa HOMEshop',
+    type: 'abertura',
+    payment_method: 'Dinheiro',
+    amount: 0,
+    paid_at: new Date().toISOString(),
+    cash_session_id: created.id
+  })
+
+  return created
+}
+
 async function getStoreSettings() {
   const user_id = await getUserId()
   const { data } = await supabase.from('store_settings').select('*').eq('user_id', user_id).limit(1).maybeSingle()
@@ -708,13 +761,7 @@ function CashPage() {
   async function load() {
     const user_id = await getUserId()
 
-    const { data: opened } = await supabase
-      .from('cash_sessions')
-      .select('*')
-      .eq('user_id', user_id)
-      .eq('status', 'aberto')
-      .maybeSingle()
-
+    const opened = await getOpenCashSession(user_id)
     setSession(opened)
 
     const start = `${month}-01`
@@ -749,6 +796,12 @@ function CashPage() {
 
   async function openCash() {
     const user_id = await getUserId()
+    if (await isHomeShopAccount(user_id)) {
+      const opened = await getOpenCashSession(user_id)
+      setSession(opened)
+      setMessage('O caixa da HOMEshop permanece aberto automaticamente.')
+      return
+    }
     const value = Number(openingAmount || 0)
 
     const { data, error } = await supabase
@@ -786,6 +839,10 @@ function CashPage() {
     if (!session) return
 
     const user_id = await getUserId()
+    if (await isHomeShopAccount(user_id)) {
+      setMessage('O caixa da HOMEshop é permanente e não pode ser fechado.')
+      return
+    }
     const value = Number(closingAmount || 0)
     const diff = value - expected
 
@@ -1513,7 +1570,7 @@ function PDVPage() {
 
   async function load() {
     const user_id = await getUserId()
-    const { data: openedCash } = await supabase.from('cash_sessions').select('*').eq('user_id', user_id).eq('status', 'aberto').maybeSingle()
+    const openedCash = await getOpenCashSession(user_id)
     setCashSession(openedCash)
     const { data: p } = await supabase.from('products').select('*').eq('user_id', user_id).order('name')
     const { data: c } = await supabase.from('customers').select('*').eq('user_id', user_id).order('name')
