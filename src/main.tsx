@@ -128,14 +128,19 @@ async function isHomeShopAccount(user_id: string) {
 }
 
 async function getOpenCashSession(user_id: string) {
-  const { data: opened, error } = await supabase
+  // Busca somente a sessão aberta mais recente. Usamos limit(1) para
+  // evitar que registros antigos/duplicados façam maybeSingle() retornar erro.
+  const { data: openedRows, error } = await supabase
     .from('cash_sessions')
     .select('*')
     .eq('user_id', user_id)
     .eq('status', 'aberto')
-    .maybeSingle()
+    .order('opened_at', { ascending: false })
+    .limit(1)
 
-  if (opened || error) return opened || null
+  const opened = openedRows?.[0] || null
+  if (opened) return opened
+  if (error) return null
 
   // HOMEshop uses a permanent cash session: if none exists, create one
   // automatically so the operator never needs to open the register manually.
@@ -1585,6 +1590,7 @@ function ReportsPage() {
 
 function PDVPage() {
   const [cashSession, setCashSession] = useState<any>(null)
+  const [homeShopAccount, setHomeShopAccount] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
@@ -1597,6 +1603,8 @@ function PDVPage() {
 
   async function load() {
     const user_id = await getUserId()
+    const isHomeShop = await isHomeShopAccount(user_id)
+    setHomeShopAccount(isHomeShop)
     const openedCash = await getOpenCashSession(user_id)
     setCashSession(openedCash)
     const { data: p } = await supabase.from('products').select('*').eq('user_id', user_id).order('name')
@@ -1633,9 +1641,17 @@ function PDVPage() {
   }
 
   async function finishSale() {
-    if (!cashSession) return setMessage('Abra o caixa antes de vender.')
     if (!cart.length) return setMessage('Carrinho vazio.')
     const user_id = await getUserId()
+
+    // Na HOMEshop o caixa é permanente. Se a tela ainda estiver sem a sessão
+    // por atraso de carregamento, tenta obtê-la novamente antes da venda.
+    let activeCashSession = cashSession
+    if (!activeCashSession && homeShopAccount) {
+      activeCashSession = await getOpenCashSession(user_id)
+      setCashSession(activeCashSession)
+    }
+    if (!activeCashSession) return setMessage('Abra o caixa antes de vender.')
     const seller = await getUserEmail()
 
     const { data: sale, error } = await supabase.from('sales').insert({
@@ -1649,7 +1665,7 @@ function PDVPage() {
       total,
       profit,
       seller_name: seller,
-      cash_session_id: cashSession?.id || null
+      cash_session_id: activeCashSession?.id || null
     }).select().single()
 
     if (error || !sale) return setMessage(error?.message || 'Erro ao vender.')
@@ -1712,7 +1728,7 @@ function PDVPage() {
 
   return (
     <div className="space-y-4">
-      {!cashSession && <div className="panel border-yellow-500/40"><h3>Caixa fechado</h3><p className="text-yellow-300">Abra o caixa antes de usar o PDV.</p></div>}
+      {!cashSession && !homeShopAccount && <div className="panel border-yellow-500/40"><h3>Caixa fechado</h3><p className="text-yellow-300">Abra o caixa antes de usar o PDV.</p></div>}
     <div className="grid xl:grid-cols-3 gap-4">
       <section className="panel">
         <h3>Buscar produto</h3>
