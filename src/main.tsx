@@ -1734,7 +1734,32 @@ function PDVPage() {
         <h3>Buscar produto</h3>
         <div className="relative">
           <Search className="absolute left-3 top-3.5 text-slate-500" size={18}/>
-          <input className="input pl-10" placeholder="Nome, código ou código de barras" value={query} onChange={e => setQuery(e.target.value)} />
+          <input
+            className="input pl-10"
+            placeholder="Nome, código ou código de barras"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              const q = query.trim().toLowerCase()
+              if (!q) return
+              const exact = products.find(p =>
+                p.name.toLowerCase() === q ||
+                String(p.product_code || '').toLowerCase() === q ||
+                String(p.barcode || '').toLowerCase() === q
+              )
+              const matches = products.filter(p =>
+                p.name.toLowerCase().includes(q) ||
+                String(p.product_code || '').toLowerCase().includes(q) ||
+                String(p.barcode || '').toLowerCase().includes(q)
+              )
+              const product = exact || (matches.length === 1 ? matches[0] : null)
+              if (product) addProduct(product)
+              else if (matches.length > 1) setMessage('Mais de um produto encontrado. Selecione o produto na lista.')
+              else setMessage('Produto não encontrado.')
+            }}
+          />
         </div>
         <div className="mt-4 space-y-2">
           {filtered.map(p => <button key={p.id} onClick={() => addProduct(p)} className="mini w-full text-left hover:border-emerald-500"><div className="flex justify-between gap-3"><div><b>{p.name}</b><p className="text-xs text-slate-500">Cód: {p.product_code || '-'} • Qtd: {p.stock}</p></div><b>{money(p.sale_price)}</b></div></button>)}
@@ -1776,6 +1801,7 @@ function ProductsPage() {
   const [form, setForm] = useState<Product>(emptyProduct)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
+  const [productSearch, setProductSearch] = useState('')
 
   async function load() {
     const user_id = await getUserId()
@@ -1914,7 +1940,15 @@ function ProductsPage() {
       </form>
 
       <section className="panel">
-        <h3>Consultar produtos</h3>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h3>Consultar produtos</h3>
+        </div>
+        <input
+          className="input mb-4"
+          placeholder="Pesquisar produto por nome, código ou código de barras"
+          value={productSearch}
+          onChange={e => setProductSearch(e.target.value)}
+        />
         <div className="overflow-auto">
           <table className="w-full text-sm">
             <thead>
@@ -1930,7 +1964,13 @@ function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map(p => (
+              {items.filter(p => {
+                const q = productSearch.trim().toLowerCase()
+                return !q ||
+                  p.name.toLowerCase().includes(q) ||
+                  String(p.product_code || '').toLowerCase().includes(q) ||
+                  String(p.barcode || '').toLowerCase().includes(q)
+              }).map(p => (
                 <tr key={p.id}>
                   <td>{p.name}</td>
                   <td>{p.product_code || '-'}</td>
@@ -3053,6 +3093,99 @@ type RomaneioItem = {
   unit_price: number
 }
 
+  async function applyRomaneioStockChange(
+    user_id: string,
+    romaneioId: string,
+    oldItems: RomaneioItem[],
+    newItems: RomaneioItem[],
+    oldReleased: boolean,
+    newReleased: boolean
+  ) {
+    const oldMap = new Map<string, number>()
+    const newMap = new Map<string, number>()
+
+    for (const item of oldItems || []) {
+      if (!item.product_id) continue
+      oldMap.set(item.product_id, (oldMap.get(item.product_id) || 0) + Number(item.quantity || 0))
+    }
+    for (const item of newItems || []) {
+      if (!item.product_id) continue
+      newMap.set(item.product_id, (newMap.get(item.product_id) || 0) + Number(item.quantity || 0))
+    }
+
+    const ids = Array.from(new Set([...oldMap.keys(), ...newMap.keys()]))
+    if (!ids.length) return null
+
+    const delta = new Map<string, number>()
+    for (const id of ids) {
+      const oldQty = oldReleased ? (oldMap.get(id) || 0) : 0
+      const newQty = newReleased ? (newMap.get(id) || 0) : 0
+      const change = newQty - oldQty
+      if (change) delta.set(id, change)
+    }
+
+    if (!delta.size) return null
+
+    const { data: currentProducts, error: productsError } = await supabase
+      .from('products')
+      .select('id, name, stock')
+      .eq('user_id', user_id)
+      .in('id', Array.from(delta.keys()))
+
+    if (productsError) return productsError.message
+
+    const byId = new Map((currentProducts || []).map((p: any) => [p.id, p]))
+    for (const [id, change] of delta) {
+      const product: any = byId.get(id)
+      if (!product) return `Produto do romaneio não encontrado.`
+      if (change > 0 && Number(product.stock || 0) < change) {
+        return `Estoque insuficiente para ${product.name}. Disponível: ${product.stock}. Necessário: ${change}.`
+      }
+    }
+
+    const applied: Array<{ id: string; change: number }> = []
+
+    for (const [id, change] of delta) {
+      const product: any = byId.get(id)
+      const nextStock = Number(product.stock || 0) - change
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ stock: nextStock })
+        .eq('id', id)
+        .eq('user_id', user_id)
+
+      if (updateError) {
+        for (const done of applied.reverse()) {
+          const original = byId.get(done.id) as any
+          await supabase.from('products').update({ stock: Number(original.stock || 0) }).eq('id', done.id).eq('user_id', user_id)
+        }
+        return updateError.message
+      }
+
+      const { error: movementError } = await supabase.from('stock_movements').insert({
+        user_id,
+        product_id: id,
+        movement_type: change > 0 ? 'saida_romaneio' : 'entrada_estorno_romaneio',
+        quantity: -change,
+        reason: `Romaneio ${romaneioId}`
+      })
+
+      if (movementError) {
+        await supabase.from('products').update({ stock: Number(product.stock || 0) }).eq('id', id).eq('user_id', user_id)
+        for (const done of applied.reverse()) {
+          const original = byId.get(done.id) as any
+          await supabase.from('products').update({ stock: Number(original.stock || 0) }).eq('id', done.id).eq('user_id', user_id)
+        }
+        return movementError.message
+      }
+
+      applied.push({ id, change })
+    }
+
+    return null
+  }
+
+
 function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page) => void }) {
   const [romaneios, setRomaneios] = useState<any[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -3075,6 +3208,25 @@ function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page
 
   const [form, setForm] = useState<any>(emptyForm)
   const [items, setItems] = useState<RomaneioItem[]>([{ product_id: '', description: '', quantity: 1, unit_price: 0 }])
+
+  async function reconcileReleasedRomaneios(user_id: string, rows: any[]) {
+    const released = (rows || []).filter(r => r.payment_status === 'Pago' && r.delivery_status === 'Entregue')
+    for (const r of released) {
+      const { data: existingMovement } = await supabase
+        .from('stock_movements')
+        .select('id')
+        .eq('user_id', user_id)
+        .eq('movement_type', 'saida_romaneio')
+        .eq('reason', `Romaneio ${r.id}`)
+        .limit(1)
+
+      if (existingMovement?.length) continue
+
+      const items = Array.isArray(r.items) ? r.items : []
+      const stockError = await applyRomaneioStockChange(user_id, r.id, [], items, false, true)
+      if (stockError) setMessage(stockError)
+    }
+  }
 
   async function load() {
     const user_id = await getUserId()
@@ -3100,6 +3252,7 @@ function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page
       .order('created_at', { ascending: false })
 
     if (error) setMessage(error.message)
+    if (!error && rs?.length) await reconcileReleasedRomaneios(user_id, rs)
     setRomaneios(rs || [])
   }
 
@@ -3168,6 +3321,18 @@ function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page
     e.preventDefault()
     const user_id = await getUserId()
 
+    let previousRomaneio: any = null
+    if (editingId) {
+      const { data: previous, error: previousError } = await supabase
+        .from('romaneios')
+        .select('*')
+        .eq('id', editingId)
+        .eq('user_id', user_id)
+        .maybeSingle()
+      if (previousError) return setMessage(previousError.message)
+      previousRomaneio = previous
+    }
+
     const payload = {
       user_id,
       customer_id: form.customer_id || null,
@@ -3205,6 +3370,29 @@ function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page
 
       if (error) return setMessage(error.message)
       saved = data
+    }
+
+    const oldItems = Array.isArray(previousRomaneio?.items) ? previousRomaneio.items : []
+    const oldReleased = previousRomaneio
+      ? previousRomaneio.payment_status === 'Pago' && previousRomaneio.delivery_status === 'Entregue'
+      : false
+    const newReleased = form.payment_status === 'Pago' && form.delivery_status === 'Entregue'
+
+    const stockError = await applyRomaneioStockChange(
+      user_id,
+      saved.id,
+      oldItems,
+      items,
+      oldReleased,
+      newReleased
+    )
+    if (stockError) {
+      // Não deixa o romaneio parecer concluído se a baixa de estoque falhou.
+      await supabase.from('romaneios').delete().eq('id', saved.id).eq('user_id', user_id)
+      if (editingId && previousRomaneio) {
+        await supabase.from('romaneios').insert(previousRomaneio)
+      }
+      return setMessage(stockError)
     }
 
     await supabase
