@@ -22,6 +22,7 @@ type Product = {
   sale_price: number
   stock: number
   min_stock: number
+  is_active?: boolean
 }
 
 type Customer = {
@@ -49,7 +50,8 @@ const emptyProduct: Product = {
   cost_price: 0,
   sale_price: 0,
   stock: 0,
-  min_stock: 0
+  min_stock: 0,
+  is_active: true
 }
 
 const emptyCustomer: Customer = {
@@ -1339,6 +1341,8 @@ function ReportsPage() {
   const ticket = validSales.length ? total / validSales.length : 0
   const productsSold = aggregateProductsSold(items).sort((a: any, b: any) => b.quantity - a.quantity)
   const lowStock = products.filter(p => Number(p.stock || 0) <= Number(p.min_stock || 0))
+  const stockCostValue = products.reduce((sum, p) => sum + Number(p.stock || 0) * Number(p.cost_price || 0), 0)
+  const stockSaleValue = products.reduce((sum, p) => sum + Number(p.stock || 0) * Number(p.sale_price || 0), 0)
   const fiado = financial.filter(f => f.type === 'receber' && !f.paid_at)
   const vendedores = Object.values(validSales.reduce((acc: any, sale: any) => {
     const seller = sale.seller_name || sale.employee_name || 'Sem vendedor'
@@ -1390,7 +1394,9 @@ function ReportsPage() {
       ['Faturamento', money(total)],
       ['Lucro', money(profit)],
       ['Qtd. vendas', String(validSales.length)],
-      ['Ticket médio', money(ticket)]
+      ['Ticket médio', money(ticket)],
+      ['Estoque a custo', money(stockCostValue)],
+      ['Estoque a preço de venda', money(stockSaleValue)]
     ]
 
     cards.forEach((c, i) => {
@@ -1403,7 +1409,7 @@ function ReportsPage() {
       doc.setFont('helvetica', 'normal')
       doc.text(c[1], x + 3, yy + 11)
     })
-    y += 42
+    y += 60
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(12)
@@ -1484,6 +1490,17 @@ function ReportsPage() {
       'Valor de Venda': Number(p.sale_price || 0)
     }))
 
+    const estoqueGeral = products.map(p => ({
+      'Produto': p.name,
+      'Código': p.product_code || '-',
+      'Status': p.is_active === false ? 'Inativo' : 'Ativo',
+      'Quantidade em Estoque': Number(p.stock || 0),
+      'Custo Unitário': Number(p.cost_price || 0),
+      'Valor Total a Custo': Number(p.stock || 0) * Number(p.cost_price || 0),
+      'Preço Unitário de Venda': Number(p.sale_price || 0),
+      'Valor Total a Preço de Venda': Number(p.stock || 0) * Number(p.sale_price || 0)
+    }))
+
     const fiadoSheet = fiado.map(f => ({
       'Cliente': f.customers?.name || 'Cliente não informado',
       'Descrição': f.description,
@@ -1513,7 +1530,9 @@ function ReportsPage() {
       'Lucro': profit,
       'Quantidade de Vendas': validSales.length,
       'Ticket Médio': ticket,
-      'Fiado em Aberto': fiado.reduce((a, f) => a + Number(f.amount || 0), 0)
+      'Fiado em Aberto': fiado.reduce((a, f) => a + Number(f.amount || 0), 0),
+      'Estoque a Custo': stockCostValue,
+      'Estoque a Preço de Venda': stockSaleValue
     }]
 
     const wb = XLSX.utils.book_new()
@@ -1521,6 +1540,7 @@ function ReportsPage() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vendas), 'Vendas')
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(produtos), 'Produtos Vendidos')
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(estoque), 'Estoque Baixo')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(estoqueGeral), 'Estoque Geral')
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fiadoSheet), 'Fiado')
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vendedoresSheet), 'Vendedores')
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientesSheet), 'Clientes')
@@ -1543,12 +1563,14 @@ function ReportsPage() {
         </div>
       </section>
 
-      <div className="grid md:grid-cols-5 gap-4">
+      <div className="grid md:grid-cols-3 xl:grid-cols-7 gap-4">
         <Card title="Faturamento" value={money(total)} icon={Receipt} />
         <Card title="Lucro" value={money(profit)} icon={Banknote} />
         <Card title="Qtd. vendas" value={String(validSales.length)} icon={ShoppingCart} />
         <Card title="Ticket médio" value={money(ticket)} icon={BarChart3} />
         <Card title="Fiado aberto" value={money(fiado.reduce((a, f) => a + Number(f.amount || 0), 0))} icon={CalendarCheck} />
+        <Card title="Estoque a custo" value={money(stockCostValue)} icon={Package} />
+        <Card title="Estoque a preço de venda" value={money(stockSaleValue)} icon={Banknote} />
       </div>
 
       <div className="grid xl:grid-cols-2 gap-4">
@@ -1607,7 +1629,7 @@ function PDVPage() {
     setHomeShopAccount(isHomeShop)
     const openedCash = await getOpenCashSession(user_id)
     setCashSession(openedCash)
-    const { data: p } = await supabase.from('products').select('*').eq('user_id', user_id).order('name')
+    const { data: p } = await supabase.from('products').select('*').eq('user_id', user_id).eq('is_active', true).order('name')
     const { data: c } = await supabase.from('customers').select('*').eq('user_id', user_id).order('name')
     setProducts(p || [])
     setCustomers(c || [])
@@ -1863,19 +1885,21 @@ function ProductsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  async function remove(id?: string) {
-    if (!id) return
-    if (!confirm('Deseja excluir este produto?')) return
+  async function setProductActive(item: Product) {
+    if (!item.id) return
+    const nextActive = item.is_active === false
+    const verb = nextActive ? 'reativar' : 'inativar'
+    if (!confirm(`Deseja ${verb} o produto "${item.name}"? ${nextActive ? 'Ele voltará a aparecer nas operações.' : 'Ele sairá das novas vendas e lançamentos, mas o histórico será preservado.'}`)) return
 
     const user_id = await getUserId()
     const { error } = await supabase
       .from('products')
-      .delete()
-      .eq('id', id)
+      .update({ is_active: nextActive })
+      .eq('id', item.id)
       .eq('user_id', user_id)
 
     if (error) return setMessage(error.message)
-    setMessage('Produto excluído.')
+    setMessage(nextActive ? 'Produto reativado.' : 'Produto inativado. Histórico preservado.')
     await load()
   }
 
@@ -1960,6 +1984,7 @@ function ProductsPage() {
                 <th>Pago</th>
                 <th>Final</th>
                 <th>Marca</th>
+                <th>Status</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -1979,13 +2004,14 @@ function ProductsPage() {
                   <td>{money(p.cost_price)}</td>
                   <td>{money(p.sale_price)}</td>
                   <td>{p.brand || '-'}</td>
+                  <td>{p.is_active === false ? 'Inativo' : 'Ativo'}</td>
                   <td className="space-x-2 whitespace-nowrap">
                     <button className="btn2" onClick={() => edit(p)}>Alterar</button>
-                    <button className="btn-danger" onClick={() => remove(p.id)}>Excluir</button>
+                    <button className={p.is_active === false ? "btn2" : "btn-danger"} onClick={() => setProductActive(p)}>{p.is_active === false ? 'Reativar' : 'Inativar'}</button>
                   </td>
                 </tr>
               ))}
-              {!items.length && <tr><td colSpan={8} className="text-slate-500">Nenhum produto cadastrado.</td></tr>}
+              {!items.length && <tr><td colSpan={9} className="text-slate-500">Nenhum produto cadastrado.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -2679,7 +2705,7 @@ function ServiceOrdersPage() {
   async function load() {
     const user_id = await getUserId()
     const { data: cs } = await supabase.from('customers').select('*').eq('user_id', user_id).order('name')
-    const { data: ps } = await supabase.from('products').select('*').eq('user_id', user_id).order('name')
+    const { data: ps } = await supabase.from('products').select('*').eq('user_id', user_id).eq('is_active', true).order('name')
     const { data: os } = await supabase.from('service_orders').select('*, customers(name, phone)').eq('user_id', user_id).order('created_at', { ascending: false })
     setCustomers(cs || [])
     setProducts(ps || [])
@@ -3242,6 +3268,7 @@ function RomaneiosPage({ setPageFromRomaneio }: { setPageFromRomaneio?: (p: Page
       .from('products')
       .select('*')
       .eq('user_id', user_id)
+      .eq('is_active', true)
       .order('name')
     setProducts(ps || [])
 

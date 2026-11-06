@@ -8,6 +8,7 @@ type Product = {
   name: string
   product_code: string | null
   sale_price: number
+  is_active?: boolean
 }
 
 type OrderItemDraft = {
@@ -297,6 +298,7 @@ export default function ServiceOrdersPage() {
       .from('products')
       .select('id, name, product_code, sale_price')
       .eq('user_id', user_id)
+      .eq('is_active', true)
       .order('name')
 
     const { data: ordersData, error } = await supabase
