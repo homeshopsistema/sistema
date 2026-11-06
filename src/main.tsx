@@ -2018,7 +2018,7 @@ function ProductsPage() {
                   <td>{p.is_active === false ? 'Inativo' : 'Ativo'}</td>
                   <td className="space-x-2 whitespace-nowrap">
                     <button className="btn2" onClick={() => edit(p)}>Alterar</button>
-                    <button className={p.is_active === false ? "btn2" : "btn-danger"} onClick={() => setProductActive(p)}>{p.is_active === false ? 'Reativar' : 'Excluir'}</button>
+                    <button className={p.is_active === false ? "btn2" : "btn-danger"} onClick={() => setProductActive(p)}>{p.is_active === false ? 'Reativar' : 'Inativar'}</button>
                   </td>
                 </tr>
               ))}
