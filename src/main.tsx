@@ -1340,9 +1340,10 @@ function ReportsPage() {
   const profit = validSales.reduce((a, s) => a + Number(s.profit || 0), 0)
   const ticket = validSales.length ? total / validSales.length : 0
   const productsSold = aggregateProductsSold(items).sort((a: any, b: any) => b.quantity - a.quantity)
-  const lowStock = products.filter(p => Number(p.stock || 0) <= Number(p.min_stock || 0))
-  const stockCostValue = products.reduce((sum, p) => sum + Number(p.stock || 0) * Number(p.cost_price || 0), 0)
-  const stockSaleValue = products.reduce((sum, p) => sum + Number(p.stock || 0) * Number(p.sale_price || 0), 0)
+  const activeProducts = products.filter(p => p.is_active !== false)
+  const lowStock = activeProducts.filter(p => Number(p.stock || 0) <= Number(p.min_stock || 0))
+  const stockCostValue = activeProducts.reduce((sum, p) => sum + Number(p.stock || 0) * Number(p.cost_price || 0), 0)
+  const stockSaleValue = activeProducts.reduce((sum, p) => sum + Number(p.stock || 0) * Number(p.sale_price || 0), 0)
   const fiado = financial.filter(f => f.type === 'receber' && !f.paid_at)
   const vendedores = Object.values(validSales.reduce((acc: any, sale: any) => {
     const seller = sale.seller_name || sale.employee_name || 'Sem vendedor'
@@ -1490,7 +1491,7 @@ function ReportsPage() {
       'Valor de Venda': Number(p.sale_price || 0)
     }))
 
-    const estoqueGeral = products.map(p => ({
+    const estoqueGeral = activeProducts.map(p => ({
       'Produto': p.name,
       'Código': p.product_code || '-',
       'Status': p.is_active === false ? 'Inativo' : 'Ativo',
@@ -1824,6 +1825,7 @@ function ProductsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [productSearch, setProductSearch] = useState('')
+  const [showInactive, setShowInactive] = useState(false)
 
   async function load() {
     const user_id = await getUserId()
@@ -1909,6 +1911,17 @@ function ProductsPage() {
     setMessage('')
   }
 
+  const filteredItems = items.filter(p => {
+    if (!showInactive && p.is_active === false) return false
+    const q = productSearch.trim().toLowerCase()
+    return !q ||
+      p.name.toLowerCase().includes(q) ||
+      String(p.product_code || '').toLowerCase().includes(q) ||
+      String(p.barcode || '').toLowerCase().includes(q)
+  })
+
+  const inactiveCount = items.filter(p => p.is_active === false).length
+
   return (
     <div className="space-y-4">
       <form onSubmit={save} className="panel">
@@ -1964,8 +1977,12 @@ function ProductsPage() {
       </form>
 
       <section className="panel">
-        <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <h3>Consultar produtos</h3>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />
+            Mostrar inativos ({inactiveCount})
+          </label>
         </div>
         <input
           className="input mb-4"
@@ -1989,13 +2006,7 @@ function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.filter(p => {
-                const q = productSearch.trim().toLowerCase()
-                return !q ||
-                  p.name.toLowerCase().includes(q) ||
-                  String(p.product_code || '').toLowerCase().includes(q) ||
-                  String(p.barcode || '').toLowerCase().includes(q)
-              }).map(p => (
+              {filteredItems.map(p => (
                 <tr key={p.id}>
                   <td>{p.name}</td>
                   <td>{p.product_code || '-'}</td>
@@ -2011,7 +2022,7 @@ function ProductsPage() {
                   </td>
                 </tr>
               ))}
-              {!items.length && <tr><td colSpan={9} className="text-slate-500">Nenhum produto cadastrado.</td></tr>}
+              {!filteredItems.length && <tr><td colSpan={9} className="text-slate-500">{items.length ? 'Nenhum produto ativo corresponde à pesquisa.' : 'Nenhum produto cadastrado.'}</td></tr>}
             </tbody>
           </table>
         </div>
