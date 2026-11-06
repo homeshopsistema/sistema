@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+  '0import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
@@ -2018,7 +2018,7 @@ function ProductsPage() {
                   <td>{p.is_active === false ? 'Inativo' : 'Ativo'}</td>
                   <td className="space-x-2 whitespace-nowrap">
                     <button className="btn2" onClick={() => edit(p)}>Alterar</button>
-                    <button className={p.is_active === false ? "btn2" : "btn-danger"} onClick={() => setProductActive(p)}>{p.is_active === false ? 'Reativar' : 'Inativar'}</button>
+                    <button className={p.is_active === false ? "btn2" : "btn-danger"} onClick={() => setProductActive(p)}>{p.is_active === false ? 'Reativar' : 'Excluir'}</button>
                   </td>
                 </tr>
               ))}
