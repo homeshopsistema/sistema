@@ -640,7 +640,11 @@ function Dashboard() {
     top: [],
     bottom: [],
     serviceOrders: 0,
-    serviceOrdersPending: 0
+    serviceOrdersPending: 0,
+    stockUnits: 0,
+    stockProductCount: 0,
+    stockCostValue: 0,
+    stockSaleValue: 0
   })
 
   async function load() {
@@ -666,6 +670,18 @@ function Dashboard() {
         .in('sale_id', saleIds)
       items = saleItems || []
     }
+
+    const { data: inventoryProducts } = await supabase
+      .from('products')
+      .select('stock, cost_price, sale_price')
+      .eq('user_id', user_id)
+      .eq('is_active', true)
+
+    const inventory = inventoryProducts || []
+    const stockUnits = inventory.reduce((sum, product) => sum + Number(product.stock || 0), 0)
+    const stockProductCount = inventory.filter(product => Number(product.stock || 0) > 0).length
+    const stockCostValue = inventory.reduce((sum, product) => sum + Number(product.stock || 0) * Number(product.cost_price || 0), 0)
+    const stockSaleValue = inventory.reduce((sum, product) => sum + Number(product.stock || 0) * Number(product.sale_price || 0), 0)
 
     const { data: financeEntries } = await supabase
       .from('financial_entries')
@@ -724,7 +740,11 @@ function Dashboard() {
       top,
       bottom,
       serviceOrders: (serviceOrdersData || []).length,
-      serviceOrdersPending
+      serviceOrdersPending,
+      stockUnits,
+      stockProductCount,
+      stockCostValue,
+      stockSaleValue
     })
   }
 
@@ -732,13 +752,17 @@ function Dashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="grid md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid md:grid-cols-3 xl:grid-cols-3 gap-4">
         <Card title="Faturamento do dia" value={money(data.todayRevenue)} icon={Receipt} />
         <Card title="Últimos 7 dias" value={money(data.weekRevenue)} icon={BarChart3} />
         <Card title="Faturamento do mês" value={money(data.monthRevenue)} icon={Banknote} />
         <Card title="Ticket médio" value={money(data.ticket)} icon={ShoppingCart} />
         <Card title="Ordens no mês" value={String(data.serviceOrders)} icon={ClipboardList} />
         <Card title="Ordens a receber" value={money(data.serviceOrdersPending)} icon={CalendarCheck} />
+        <Card title="Unidades em estoque" value={String(data.stockUnits)} icon={Package} />
+        <Card title="Produtos com estoque" value={String(data.stockProductCount)} icon={Package} />
+        <Card title="Valor da mercadoria (custo)" value={money(data.stockCostValue)} icon={Banknote} />
+        <Card title="Venda potencial total" value={money(data.stockSaleValue)} icon={ShoppingCart} />
       </div>
 
       <div className="grid xl:grid-cols-2 gap-4">
